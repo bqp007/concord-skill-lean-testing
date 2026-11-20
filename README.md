@@ -63,11 +63,11 @@ When a same-authority test fails, nobody can tell which side is wrong, so the on
 
 ### The procedure
 
-1. **Classify** each touched part. Logic gets unit tests. A contract gets one contract test per boundary. Config gets no tests on its values; tests inject their own. Quality on real data gets an evaluation with an owner-set metric. Glue gets one integration path. Trivial code gets nothing.
+1. **Classify** each touched part. Logic gets unit tests. A contract gets one contract test per boundary, which checks values, not only shape. Config gets no tests on its values; unit tests inject their own, and one release check runs the loader on the shipped files. Quality on real data gets an evaluation with an owner-set metric. Glue gets one integration path. Trivial code gets nothing.
 2. **List the behavior classes** for each spec clause, with their boundaries. Each class gets one test. The number of classes sets the test budget; the number of changed lines does not.
 3. **Reuse** before you add: keep, extend, replace, merge or delete existing tests. Add a test only for a class that no test covers.
 4. **Write** each test before the code, from the spec, through the public interface, with the config built inside the test.
-5. **Guard** only where input enters the system. A guard for a state that cannot occur adds a branch, and that branch then asks for a test.
+5. **Guard** only where input enters the system, and where shared state changes: there, enforce the invariant in one atomic step. A guard for a state that cannot occur adds a branch, and that branch then asks for a test.
 6. **Check** completeness and minimality. When the check holds, stop writing tests.
 7. **Consolidate** the tests that the task touched.
 
@@ -75,7 +75,7 @@ When a same-authority test fails, nobody can tell which side is wrong, so the on
 
 The test set is **complete** when every behavior class has a test, and every branch that the change adds is either reached by a test or has a stated reason: glue, third-party code, logging only, or guaranteed by the type system.
 
-The test set is **minimal** when every test maps to exactly one behavior class, and no test reads production config, asserts a config value or reaches a private symbol.
+The test set is **minimal** when every test maps to exactly one behavior class, no unit test reads production config, and no test asserts a tuned config value or reaches a private symbol.
 
 A changed branch that no requirement asks for is an undecided behavior. The owner decides it, or the code goes. A test would only make it permanent.
 
@@ -125,7 +125,7 @@ The skill is a companion to [Concord](https://github.com/bqp007/concord-agent-ha
 - Google Testing Blog, "Change-Detector Tests Considered Harmful" (2015).
 - Thomas Ostrand and Marc Balcer, "The Category-Partition Method for Specifying and Generating Functional Tests," *Communications of the ACM*, 1988.
 - Matthias Grochtmann and Klaus Grimm, "Classification Trees for Partition Testing," *Software Testing, Verification and Reliability*, 1993.
-- RTCA DO-178C: modified condition/decision coverage (MC/DC).
+- RTCA DO-178C: modified condition/decision coverage (MC/DC); Hayhurst, Veerhusen, Chilenski and Rierson, *A Practical Tutorial on Modified Condition/Decision Coverage*, NASA/TM-2001-210876 (2001), for masking MC/DC and coupled conditions.
 - Mary Jean Harrold, Rajiv Gupta and Mary Lou Soffa, "A Methodology for Controlling the Size of a Test Suite," *ACM TOSEM*, 1993.
 - Bertrand Meyer, *Object-Oriented Software Construction*, 2nd ed. (1997): Design by Contract and the non-redundancy principle.
 - Alexis King, "Parse, Don't Validate" (2019).

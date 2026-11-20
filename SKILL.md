@@ -37,8 +37,8 @@ Decide what kind of thing each touched part is before you write a test. The kind
 | Kind | How to recognize it | What it gets |
 |---|---|---|
 | Logic | rules, decisions, transforms and calculations on inputs | unit tests through the public interface, one per behavior class |
-| Contract | something outside the unit reads it: an API, a schema, a file or wire format | one contract test per boundary: a schema check or an approved golden file |
-| Config | a value someone tunes (see below) | no tests on its values; tests inject their own config; the loader checks types and ranges once, at load |
+| Contract | something outside the unit reads it: an API, a schema, a file or wire format | one contract test per boundary that checks values, not only shape, usually against a golden file the spec owner approved; a schema check alone accepts a wrong value of the right type |
+| Config | a value someone tunes (see below) | no tests on its values; unit tests inject their own config; the loader checks the rules of the shipped files at load, and one release check runs it on them |
 | Quality on real data | the result only means something with production data, models or config | an evaluation with a metric and a threshold the owner sets, outside the unit suite |
 | Glue | wiring, controllers, composition: many collaborators, little logic | one integration path that exercises it |
 | Trivial or covered elsewhere | getters, data classes, properties the compiler or type checker proves, third-party behavior | no tests |
@@ -48,6 +48,8 @@ Decide what kind of thing each touched part is before you write a test. The kind
 A value is config when the spec names the parameter but not its value, when it changes for tuning rather than for correctness, and when it lives in a config file, a constants module, a bundle or an environment variable. A test that asserts a config value only repeats the config file. Whoever retunes the value must also edit the test, so the test catches nothing and adds a maintenance step to every retune.
 
 A value is a contract when the spec fixes the exact value: a legal retention period, a protocol constant, a published limit. A contract value gets one test.
+
+Shipped config still obeys rules that outrank its values: required keys, types, ranges, and references between files, such as every route naming a label that the label file defines. Put those rules in the loader, so that production fails fast too, and add one release check that runs the loader on the shipped files. That check reads production config but asserts no tuned value, so a retune that keeps the rules passes it.
 
 Test the logic around a config value with values the test chooses:
 
@@ -61,9 +63,9 @@ Test the logic around a config value with values the test chooses:
 
 ## 2. List the behavior classes
 
-For each spec clause the change touches, split the inputs into classes that must produce the same kind of result. Add a boundary case where a class has an edge. Each class is a leaf of the behavior tree, and each leaf gets one test. In a table-driven test, each row counts as one test. Where a law covers a whole class (round trip, ordering), one property test can stand for that class.
+For each spec clause the change touches, split the inputs into classes that must produce the same kind of result. Add a boundary case where a class has an edge. Each class is a leaf of the behavior tree, and each leaf gets one test. A layer that transforms a value on its way through, such as a serializer, a mapper or a parser, adds leaves of its own, because it can break a value that the layer below computed correctly. In a table-driven test, each row counts as one test. Where a law covers a whole class (round trip, ordering), one property test can stand for that class.
 
-For a decision with N conditions joined by and/or, use modified condition/decision coverage (MC/DC): N+1 cases, each showing that one condition alone changes the result. That is the smallest set that proves every condition matters.
+For a decision with two or more conditions joined by and/or, use modified condition/decision coverage (MC/DC): for each condition, a pair of cases that differ in that condition alone and give different results. Pairs share cases, so N conditions take at least N+1 cases and at most 2N; find the pairs before you set the budget. Branch coverage alone can pass while a condition never decides anything; MC/DC is the cheapest set that shows each one does. When a condition appears twice, as A does in `(A && B) || (A && C)`, no pair can change one appearance alone. Simplify the decision first (`A && (B || C)`). Where it cannot be simplified, let the other appearance change too while another condition masks it (masking MC/DC).
 
 The number of leaves sets the test budget. The number of changed lines does not.
 
@@ -83,16 +85,18 @@ A bug fix adds a test only when the bug's leaf had no test. When a test covered 
 
 - Write the test before the implementation, from the clause. Take the expected value from the spec, not from running the code or reading a constant.
 - Call only the public interface: the function, endpoint or command that real callers use. Do not call private symbols, and do not extract a helper only so that a test can call it. Tests on private code break on every refactor.
-- Build the config the test needs inside the test. Do not read production config files.
+- Build the config a unit test needs inside the test. Only the release check from step 1 reads the shipped config files.
 - Mock only out-of-process dependencies that the code does not own, such as network services and third-party APIs. Inject the clock and the random source. Use real instances of everything else; a mock of your own module freezes its internal calls.
 - Name the test after its leaf, and be able to say in one line which fault it catches. If another test catches the same fault, merge the two.
-- Cover each behavior at one layer, the highest layer that reaches it. Do not test it again below.
+- Test each leaf at the lowest interface that is a contract: one that callers outside the unit use and that a refactor inside the unit leaves alone. That is usually the cheapest layer that shows the fault. Do not test the same fault again at another layer.
 - Assert only the result of the behavior the test names: no asserts on the setup and no asserts inside test helpers.
 - Keep wall-clock timing out of unit tests. A benchmark measures speed.
 
 ## 5. Add guards only at trust boundaries
 
 A routine does not re-check its own preconditions; its callers own them. Parse and validate input once, where it enters the system: network, files, user input, deserialization, config load. Inside that boundary, trust the types and the callers.
+
+State that something else can change between the check and the use is input too: a balance that two requests spend at once, a row, a file, a remote resource. Both requests can pass validation and still overspend. Enforce that invariant where the state changes, in one atomic step: a conditional update, a constraint, a lock or a compare-and-swap. That check is a trust boundary, not a defensive copy.
 
 Every guard adds a branch, and every branch needs a test or a reason. A guard for a state that cannot occur doubles the cost and protects nothing. Before you add a guard, check two things: that a real input can reach this line in that state, and that the code does not already enforce it. Where you can, choose a type that cannot hold the bad state instead of a check that rejects it.
 
@@ -104,7 +108,7 @@ After the implementation passes, check these six points. When all six hold, stop
 2. Every branch that the diff adds or changes is reached by a test, or has one of these reasons: glue covered by an integration path, third-party behavior, logging or metrics only, guaranteed by the type system. Run the repository's branch-coverage tool on the diff to find unreached branches. Record each reason in the test plan, not as a coverage pragma in production code. "Unreachable" is not a reason: delete that code.
 3. A changed branch that no clause asks for is an undecided behavior. Ask the owner to decide it, or delete it. A test would make the undecided behavior permanent.
 4. Every test maps to a leaf. Delete a test that maps to none.
-5. No test reads production config, asserts a config value, or reaches a private symbol.
+5. No unit test reads production config, and no test asserts a tuned config value or reaches a private symbol.
 6. Every expected value comes from a source that outranks the code.
 
 A coverage percentage is not the goal; a percentage target rewards extra tests. The goal is that every branch is accounted for.
