@@ -62,13 +62,13 @@ State that something else can change between the check and the use is input too:
 **Complete**
 
 - Every distinct behavior that the change must have, including its failure modes, is covered by at least one assertion that fails when the behavior breaks. A case may cover several behaviors. Behaviors come from the requirement, not from the lines changed.
-- No path through the changed code is left unaccounted for. Each one is exercised, or you can say where it runs (another platform, a deployment variant), which invariant prevents it, or what prevents verification. Delete code only on evidence that it is dead across the supported configurations. A coverage percentage is not a goal.
-- A changed path that no requirement asks for is an undecided behavior. Ask the owner to decide it, or remove it. A test would make it permanent.
+- No path through the changed code is left unaccounted for. Each one is exercised, or you can say where it runs (another platform, a deployment variant), which invariant prevents it, or what prevents verification. A required behavior that could not be verified stays open: report the gap, and do not count it as covered. Delete code only on evidence that it is dead across the supported configurations. A coverage percentage is not a goal.
+- A changed path that introduces an observable behavior no requirement asks for is an undecided behavior. Ask the owner to decide it, or remove it; a test would make it permanent. A path that keeps behavior, such as an equivalent fast path, needs no decision.
 
 **Minimal**
 
 - Every case catches a failure that the rest of the suite would miss, and you can say which one. Merge or remove a case when the remaining suite preserves its coverage.
-- Existing tests come first. Keep, extend or correct the test that already covers a behavior, and add a case only for a behavior that no test covers. When a test covered the behavior and let a bug through, fix that test.
+- Existing tests come first. Keep, extend or correct the test that already covers a behavior, and add or extend a case only when it catches a failure that the suite misses. When a test covered the behavior and let a bug through, fix that test.
 - No test asserts a tuned config value, repeats the algorithm, or is tied to incidental detail such as private symbols, its own setup or wall-clock time.
 - No guard exists for a state that cannot occur.
 
@@ -86,4 +86,4 @@ Without evidence, the finding is a question, not a defect.
 ## Limits
 
 - Completeness holds only relative to the behaviors you listed and the paths you examined. Whether the behaviors match the real requirement is for the spec and its owner to settle.
-- Coverage shows that a branch ran, not that a test checked its result. Mutation testing on the diff shows the second, but it costs much more; run it only when asked.
+- Coverage shows that a branch ran, not that a test checked its result. Mutation testing on the diff shows the second, but it costs much more; weigh that cost against what the project requires.

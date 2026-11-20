@@ -42,7 +42,7 @@ flowchart TD
     D[Diff] --> BR[Paths through the changed code]
     B --> C{Complete?}
     BR --> C
-    C -- a behavior or a path is unaccounted for --> T[Add or correct a case]
+    C -- a behavior or a path is unaccounted for --> T[Cover the behavior or account for the path]
     T --> C
     C -- yes --> M{Minimal?}
     M -- a case catches nothing new --> X[Merge or remove it]
@@ -74,11 +74,11 @@ When a same-authority test fails, nobody can tell which side is wrong, so the on
 
 ### What a finished test set shows
 
-The test set is **complete** when every distinct behavior the change must have is covered by at least one assertion that fails when the behavior breaks, and no path through the changed code is left unaccounted for: it is exercised, or you can say where it runs, which invariant prevents it, or what prevents verification.
+The test set is **complete** when every distinct behavior the change must have is covered by at least one assertion that fails when the behavior breaks, and no path through the changed code is left unaccounted for: it is exercised, or you can say where it runs, which invariant prevents it, or what prevents verification. A required behavior that could not be verified is reported as open, not counted as covered.
 
 The test set is **minimal** when every case catches a failure that the rest of the suite would miss, existing tests were reused before new ones were added, and no test asserts a tuned config value or is tied to incidental detail.
 
-A changed path that no requirement asks for is an undecided behavior. The owner decides it, or the code goes. A test would only make it permanent.
+A changed path that introduces an observable behavior no requirement asks for is an undecided behavior. The owner decides it, or the code goes. A test would only make it permanent.
 
 ## Install
 
