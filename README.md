@@ -59,8 +59,8 @@ Each new case is weighed against the tests that already exist:
 flowchart TD
     N[New case] --> Q{Compare with the existing tests of that behavior}
     Q -- catches a failure none of them catches --> A[Keep it as a new test or a new row]
-    Q -- an existing test already catches it --> DN[Do not add it]
-    Q -- catches everything an existing test catches plus more --> RP[The older test can go]
+    Q -- the existing suite catches every failure this case catches --> DN[Do not add it]
+    Q -- catches everything an existing test catches where that test must catch it --> RP[The older test can go]
     Q -- contradicts an existing test --> CF{What does the source say?}
     CF -- the requirement changed --> RQ[Replace the old expectation and name the requirement]
     CF -- the old expectation was wrong or pinned a detail --> FX[Correct or remove it and say why]
@@ -89,7 +89,7 @@ When a same-authority test fails, nobody can tell which side is wrong, so the on
 3. **Config is not behavior.** No test asserts a tuned value; unit tests inject their own. The production loader validates the shipped files, profile selection and override precedence are tested through the normal entry point, and quality on real data is an evaluation with an owner-set metric.
 4. **Test through contracts.** Test behavior through an interface that real callers use and that a refactor leaves alone. A test tied to private symbols or to mocks of your own modules follows how the code is built, not what it promises. The layer is the agent's call.
 5. **Guards belong at trust boundaries.** Validate where input enters the system, and enforce invariants on shared state in one atomic step where that state changes. A guard for a state that cannot occur adds a branch, and that branch then asks for a test.
-6. **The suite outlives the task.** Each test is a standing claim, and a task changes the set of claims. A new case earns its place only by catching a failure that the existing tests miss. A contradiction is a conflict between requirements, and the source decides whether the code or the test changes. An expectation whose behavior is gone is removed in the same change, and checks for surviving behavior stay. Only the tests of the touched behaviors are maintained, and no test is removed on equal coverage alone.
+6. **The suite outlives the task.** Each test is a standing claim, and a task changes the set of claims. A new case earns its place only by catching a failure that the existing tests miss. A contradiction is a conflict between expectations, and the governing source decides whether the code or the test changes. An expectation whose behavior is gone is removed in the same change, and checks for surviving behavior stay. Only the tests of the touched behaviors are maintained, and no test is removed on equal coverage alone.
 
 ### What a finished test set shows
 
@@ -97,7 +97,7 @@ The test set is **complete** when every distinct behavior the change must have i
 
 The test set is **minimal** when every case catches a failure that the rest of the suite would miss, existing tests were reused before new ones were added, and no test asserts a tuned config value or is tied to incidental detail.
 
-The test set is **consistent with the suite** when every expectation whose meaning changed, or that was removed, is explained by its source, no expectation remains for a removed behavior while checks for surviving behavior are kept, and assertions on untouched behaviors are unchanged.
+The test set is **consistent with the suite** when every expectation whose meaning changed, or that was removed, is explained (by the requirement that changed, by why the old expectation was unsupported, or by the remaining test that keeps its coverage), no expectation remains for a removed behavior while checks for surviving behavior are kept, and tests of untouched behaviors still exercise and verify what they did before.
 
 A changed path that introduces an observable behavior no requirement asks for is an undecided behavior. The owner decides it, or the code goes. A test would only make it permanent.
 

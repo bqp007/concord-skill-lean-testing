@@ -59,9 +59,9 @@ State that something else can change between the check and the use is input too:
 
 ### The suite outlives the task
 
-The tests you write join a suite that other tasks wrote and later tasks will change. Each test is a standing claim: this behavior, this expected result, from this source. A task changes that set of claims, so weigh each new case against the tests that are already there. A new case earns its place only by catching a failure that the existing tests miss. When it catches everything an existing test catches and more, the older test has nothing left to add. Whether the case becomes a new test, a row in an existing one or a replacement is your call.
+The tests you write join a suite that other tasks wrote and later tasks will change. Each test is a standing claim: this behavior, this expected result, from this source. A task changes that set of claims, so weigh each new case against the tests that are already there. A new case earns its place only by catching a failure that the existing tests miss. When it catches everything an existing test catches, at the point where that test has to catch it, the older test has nothing left to add. A nightly test does not replace a check that must fail before merge. Whether the case becomes a new test, a row in an existing one or a replacement is your call.
 
-A new expectation that contradicts an existing test is a conflict between requirements, not between tests. An existing test that turns red is evidence first, and the source decides whether the code or the test changes: the requirement may have changed, the old expectation may have been wrong or tied to an incidental detail, or the new code may be wrong. When two sources of equal rank disagree, ask the owner. Do not edit an expectation until it passes without saying what the source supports.
+A new expectation that contradicts an existing test is a conflict between expectations, and the governing source settles it. An existing test that turns red is evidence first, and the source decides whether the code or the test changes: the requirement may have changed, the old expectation may have been wrong or tied to an incidental detail, or the new code may be wrong. When two sources of equal rank disagree, ask the owner. Do not edit an expectation until it passes without saying what the source supports.
 
 An expectation whose behavior the change removed can keep passing, so nothing flags it. Remove it in the same change, and keep the checks in that test for behavior that survives.
 
@@ -86,9 +86,9 @@ All of this works only when a test says what it guards. Name each test for its b
 
 **Consistent with the suite**
 
-- Every expectation whose meaning changed, or that was removed, is explained by its source: the requirement that changed, or why the old expectation was unsupported.
+- Every expectation whose meaning changed, or that was removed, is explained: by the requirement that changed, by why the old expectation was unsupported, or by the remaining test that keeps its coverage.
 - No expectation remains for a behavior the change removed, and the checks for behavior that survives are kept.
-- Assertions on behaviors the task did not touch are unchanged. An edit to shared setup that only keeps those tests running does not count as a change to them.
+- Tests of behaviors the task did not touch still exercise and verify what they did before. An edit to shared setup is fine when it preserves that.
 
 When all three hold, stop writing tests. At the end of a task, go over the tests it touched once more against these points.
 
