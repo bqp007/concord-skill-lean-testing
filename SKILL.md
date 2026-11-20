@@ -40,7 +40,7 @@ A good test set rejects every change that breaks a promise. It accepts every cha
 
 A value is config when the spec names the parameter but not its value, and the value changes for tuning rather than for correctness. A test that asserts a config value only repeats the config file: whoever retunes the value must also edit the test, so the test catches nothing. A value is a contract when the spec fixes it exactly, such as a legal retention period or a protocol constant, and then a test may assert it.
 
-Test the logic around a config value with values the test chooses. For "flag a score at or above the threshold", inject a threshold `T` and assert that a score just below `T` is not flagged, that `T` is flagged, and that a score above `T` is flagged. The test survives any retune. The first two cases catch `>` written for `>=`, and the third catches `==`. Two inputs with the same expected result both earn their place when they catch different failures.
+Test the logic around a config value with values the test chooses. For "flag a score at or above the threshold", inject a threshold `T` and assert that a score just below `T` is not flagged, that `T` is flagged, and that a score above `T` is flagged. The test survives any retune. The case at `T` catches `>` written for `>=`, the case above `T` catches `==`, and the case below `T` catches a rule that flags everything. Two inputs with the same expected result both earn their place when they catch different failures.
 
 Config still needs checks, and none of them asserts a tuned value:
 - The shipped files obey rules that outrank their values: required keys, types, ranges, and references between files. Enforce those rules in the production loader, so that production fails fast too, and run that loader on the final shipped artifacts.
@@ -49,7 +49,7 @@ Config still needs checks, and none of them asserts a tuned value:
 
 ### Test through contracts
 
-Call the interface that real callers use, at the lowest level that is a contract: callers outside the unit use it, and a refactor inside the unit leaves it alone. Tests on private symbols, or on a helper extracted only so that a test can call it, break on every refactor. Use real instances of your own modules; a mock of your own module freezes its internal calls. A layer that transforms a value on its way through, such as a serializer, a mapper or a parser, has behaviors of its own, because it can break a value that the layer below computed correctly.
+Test behavior through an interface that real callers use and that a refactor inside the unit leaves alone. A test that reaches a private symbol, calls a helper extracted only for the test, or mocks one of your own modules is tied to how the code is built, not to what it promises, so it breaks on refactors that keep behavior. Which layer to test at is your call: pick the one where the promise is stated and a failure shows clearly.
 
 ### Guards belong at trust boundaries
 
@@ -61,29 +61,29 @@ State that something else can change between the check and the use is input too:
 
 **Complete**
 
-- Every distinct behavior that the change must have is covered by at least one assertion that fails when the behavior breaks. A case may cover several behaviors. Behaviors come from the requirement, not from the lines changed: the input classes and their boundaries, the error paths, each way a transform can alter a value, and each condition of a compound decision that can change the result. A condition that no feasible input lets change the result is redundant: simplify the decision when that preserves behavior, or state why the condition stays.
-- Every branch that the change adds or alters is exercised or accounted for: state where it runs (another platform, a deployment variant), which invariant prevents it, or what prevents verification. Delete a branch only on evidence that it is dead across the supported configurations. Use branch coverage on the diff where the tooling supports it. A coverage percentage is not a goal.
-- A changed branch that no requirement asks for is an undecided behavior. Ask the owner to decide it, or remove it. A test would make it permanent.
+- Every distinct behavior that the change must have, including its failure modes, is covered by at least one assertion that fails when the behavior breaks. A case may cover several behaviors. Behaviors come from the requirement, not from the lines changed.
+- No path through the changed code is left unaccounted for. Each one is exercised, or you can say where it runs (another platform, a deployment variant), which invariant prevents it, or what prevents verification. Delete code only on evidence that it is dead across the supported configurations. A coverage percentage is not a goal.
+- A changed path that no requirement asks for is an undecided behavior. Ask the owner to decide it, or remove it. A test would make it permanent.
 
 **Minimal**
 
 - Every case catches a failure that the rest of the suite would miss, and you can say which one. Merge or remove a case when the remaining suite preserves its coverage.
 - Existing tests come first. Keep, extend or correct the test that already covers a behavior, and add a case only for a behavior that no test covers. When a test covered the behavior and let a bug through, fix that test.
-- No test asserts a tuned config value, reaches a private symbol, repeats the algorithm, asserts on its own setup, or depends on wall-clock time.
+- No test asserts a tuned config value, repeats the algorithm, or is tied to incidental detail such as private symbols, its own setup or wall-clock time.
 - No guard exists for a state that cannot occur.
 
 When both hold, stop writing tests. At the end of a task, go over the tests it touched once more against these points.
 
 ## Reviewing tests
 
-A finding on a test needs evidence in one of three forms:
+A finding on a test names the affected behavior and shows evidence, such as:
 - a wrong implementation that the test still accepts (the test cannot fail);
 - an allowed change that the test rejects, such as a retuned config value or a refactor that keeps behavior (the test pins something it should not);
-- a required case that is skipped, never collected, or nondeterministic. Name the behavior and give a reproducer or the execution evidence.
+- a required case that is skipped, never collected, or nondeterministic.
 
-Without one of these, the finding is a question, not a defect.
+Without evidence, the finding is a question, not a defect.
 
 ## Limits
 
-- Completeness holds only relative to the behaviors you listed and the branches you measured. Whether the behaviors match the real requirement is for the spec and its owner to settle.
+- Completeness holds only relative to the behaviors you listed and the paths you examined. Whether the behaviors match the real requirement is for the spec and its owner to settle.
 - Coverage shows that a branch ran, not that a test checked its result. Mutation testing on the diff shows the second, but it costs much more; run it only when asked.

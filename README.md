@@ -30,7 +30,7 @@ def test_flags_scores_at_or_above_the_threshold(score, flagged):
     assert classify(score, threshold=0.70) is flagged
 ```
 
-This test survives any retune. The first two cases fail if someone writes `>` where the rule says `>=`, and the third fails for `==`. Two inputs with the same expected result both earn their place, because they catch different failures.
+This test survives any retune. The case at 0.70 fails if someone writes `>` where the rule says `>=`, the case at 0.71 fails for `==`, and the case at 0.69 fails for a rule that flags everything. Two inputs with the same expected result both earn their place, because they catch different failures.
 
 The same rule removes snapshot tests that nobody reviewed, tests of private helpers, mocks of the project's own modules, guards for states that cannot occur, and the reflex of adding a new regression test for every bug when an existing test should have caught it.
 
@@ -39,10 +39,10 @@ The same rule removes snapshot tests that nobody reviewed, tests of private help
 ```mermaid
 flowchart TD
     R[Requirement] --> B[Behaviors the change must have]
-    D[Diff] --> BR[Branches added or altered]
+    D[Diff] --> BR[Paths through the changed code]
     B --> C{Complete?}
     BR --> C
-    C -- a behavior or a branch is unaccounted for --> T[Add or correct a case]
+    C -- a behavior or a path is unaccounted for --> T[Add or correct a case]
     T --> C
     C -- yes --> M{Minimal?}
     M -- a case catches nothing new --> X[Merge or remove it]
@@ -69,16 +69,16 @@ When a same-authority test fails, nobody can tell which side is wrong, so the on
 1. **The expected value must outrank the code.** See the table above.
 2. **The test set is a filter on changes.** It rejects every change that breaks a promise and accepts every change the spec allows.
 3. **Config is not behavior.** No test asserts a tuned value; unit tests inject their own. The production loader validates the shipped files, profile selection and override precedence are tested through the normal entry point, and quality on real data is an evaluation with an owner-set metric.
-4. **Test through contracts.** Use the interface real callers use, at the lowest level that a refactor leaves alone. No private symbols, no mocks of your own modules.
+4. **Test through contracts.** Test behavior through an interface that real callers use and that a refactor leaves alone. A test tied to private symbols or to mocks of your own modules follows how the code is built, not what it promises. The layer is the agent's call.
 5. **Guards belong at trust boundaries.** Validate where input enters the system, and enforce invariants on shared state in one atomic step where that state changes. A guard for a state that cannot occur adds a branch, and that branch then asks for a test.
 
 ### What a finished test set shows
 
-The test set is **complete** when every distinct behavior the change must have is covered by at least one assertion that fails when the behavior breaks, and every branch that the change adds or alters is exercised or accounted for: where it runs, which invariant prevents it, or what prevents verification.
+The test set is **complete** when every distinct behavior the change must have is covered by at least one assertion that fails when the behavior breaks, and no path through the changed code is left unaccounted for: it is exercised, or you can say where it runs, which invariant prevents it, or what prevents verification.
 
-The test set is **minimal** when every case catches a failure that the rest of the suite would miss, existing tests were reused before new ones were added, and no test asserts a tuned config value or reaches a private symbol.
+The test set is **minimal** when every case catches a failure that the rest of the suite would miss, existing tests were reused before new ones were added, and no test asserts a tuned config value or is tied to incidental detail.
 
-A changed branch that no requirement asks for is an undecided behavior. The owner decides it, or the code goes. A test would only make it permanent.
+A changed path that no requirement asks for is an undecided behavior. The owner decides it, or the code goes. A test would only make it permanent.
 
 ## Install
 
@@ -110,14 +110,14 @@ The skill is a companion to [Concord](https://github.com/bqp007/concord-agent-ha
 
 - **A test suite is a filter on changes.** It should reject every change that breaks a promise and accept every change the spec allows: refactors, retunes, performance work, new features, renames and log text. Most over-testing is a filter that rejects allowed changes.
 - **Information needs authority.** A test checked against config or against the code's own output can only report that something changed. It cannot report that something is wrong.
-- **Completeness and minimality come from two lists.** One list holds the behaviors that the requirement decides. The other holds the branches that the changed code takes. Each behavior is covered, each branch is exercised or explained, and each case catches a failure the others miss. The size of the suite follows from the behaviors, not from a count fixed in advance.
+- **Completeness and minimality come from two lists.** One list holds the behaviors that the requirement decides. The other holds the paths through the changed code. Each behavior is covered, each path is exercised or explained, and each case catches a failure the others miss. The size of the suite follows from the behaviors, not from a count fixed in advance.
 - **Principles, not procedure.** A capable model does not need a recipe, and a recipe constrains it. The skill says what a good test set is and leaves the method open.
 - **Guards cost twice.** Every guard adds a branch, and every branch asks for a test. Validating input once, at the boundary, keeps both the code and the tests small.
-- **Coverage percentages reward extra tests.** The stopping check asks that every branch be accounted for, not that a number goes up.
+- **Coverage percentages reward extra tests.** The stopping check asks that every path be accounted for, not that a number goes up.
 
 ## Limits
 
-- Completeness holds only relative to the behaviors you listed and the branches you measured. Whether the behaviors match the real requirement is for the spec and its owner to settle.
+- Completeness holds only relative to the behaviors you listed and the paths you examined. Whether the behaviors match the real requirement is for the spec and its owner to settle.
 - Coverage shows that a branch ran, not that a test checked its result. Mutation testing on the diff shows that, at a much higher cost.
 
 ## Sources
