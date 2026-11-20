@@ -9,7 +9,7 @@
 
 AI coding agents write tests faster than anyone can read them, and they write too many. They pin config values, mirror the implementation they just wrote, reach into private helpers, and add a guard (and a test for it) for every state they can imagine. Each test passes on the day it is written. Then every retune, refactor or rename turns some of them red, and the fix is always to edit the test. The suite has stopped defending the code and started freezing it.
 
-This skill gives an agent a small set of principles for what a test may assert, and a description of a finished test set, complete and minimal, so that it knows when to stop. It prescribes no technique and no test count; how to get there is left to the agent's judgment.
+This skill gives an agent a small set of principles for what a test may assert, and a description of a finished test set, complete and minimal, so that it knows when to stop. It also says how new tests join a suite that already exists: what to do with a duplicate, a weaker old test, a contradiction, or a test that went stale. It prescribes no technique and no test count; how to get there is left to the agent's judgment.
 
 ## What changes
 
@@ -50,6 +50,22 @@ flowchart TD
     M -- yes --> S[Stop]
 ```
 
+Each new case is placed against the tests that already exist:
+
+```mermaid
+flowchart TD
+    N[New case] --> Q{Compare with the existing tests of that behavior}
+    Q -- catches a failure none of them catches --> A[Add it beside them]
+    Q -- an existing test already catches it --> DN[Do not add it]
+    Q -- catches more than an existing test --> RP[Replace the weaker test]
+    Q -- new input class of a tested behavior --> EX[Extend that test]
+    Q -- contradicts an existing test --> CF{What does the source say?}
+    CF -- the requirement changed --> RQ[Replace the old expectation and name the requirement]
+    CF -- the old test pinned a detail --> FX[Correct or delete the old test]
+    CF -- the new code is wrong --> CD[Change the code]
+    CF -- sources of equal rank disagree --> OW[Ask the owner]
+```
+
 ### The core rule
 
 A failing test signals a mismatch between the code and an expectation. The failure helps only when a source independent of the code can settle which side is wrong.
@@ -71,12 +87,15 @@ When a same-authority test fails, nobody can tell which side is wrong, so the on
 3. **Config is not behavior.** No test asserts a tuned value; unit tests inject their own. The production loader validates the shipped files, profile selection and override precedence are tested through the normal entry point, and quality on real data is an evaluation with an owner-set metric.
 4. **Test through contracts.** Test behavior through an interface that real callers use and that a refactor leaves alone. A test tied to private symbols or to mocks of your own modules follows how the code is built, not what it promises. The layer is the agent's call.
 5. **Guards belong at trust boundaries.** Validate where input enters the system, and enforce invariants on shared state in one atomic step where that state changes. A guard for a state that cannot occur adds a branch, and that branch then asks for a test.
+6. **The suite outlives the task.** Each test is a standing claim, and a task changes the set of claims. A new case is added, merged or dropped by comparing the failures it catches with those the existing tests catch. A contradiction is a conflict between requirements, and the source decides it. A test whose behavior is gone is deleted in the same change. Only the tests of the touched behaviors are maintained, and no test is removed on equal coverage alone.
 
 ### What a finished test set shows
 
 The test set is **complete** when every distinct behavior the change must have is covered by at least one assertion that fails when the behavior breaks, and no path through the changed code is left unaccounted for: it is exercised, or you can say where it runs, which invariant prevents it, or what prevents verification. A required behavior that could not be verified is reported as open, not counted as covered.
 
 The test set is **minimal** when every case catches a failure that the rest of the suite would miss, existing tests were reused before new ones were added, and no test asserts a tuned config value or is tied to incidental detail.
+
+The test set is **consistent with the suite** when every new case was placed against the existing tests of its behavior, every edited or deleted expectation names the requirement that changed or the detail the old test pinned, no test remains for a removed behavior, and tests of untouched behaviors are unchanged.
 
 A changed path that introduces an observable behavior no requirement asks for is an undecided behavior. The owner decides it, or the code goes. A test would only make it permanent.
 
@@ -112,6 +131,8 @@ The skill is a companion to [Concord](https://github.com/bqp007/concord-agent-ha
 - **Information needs authority.** A test checked against config or against the code's own output can only report that something changed. It cannot report that something is wrong.
 - **Completeness and minimality come from two lists.** One list holds the behaviors that the requirement decides. The other holds the paths through the changed code. Each behavior is covered, each path is exercised or explained, and each case catches a failure the others miss. The size of the suite follows from the behaviors, not from a count fixed in advance.
 - **Principles, not procedure.** A capable model does not need a recipe, and a recipe constrains it. The skill says what a good test set is and leaves the method open.
+- **A red existing test is evidence, and an edited expectation is a claim.** Refactors, new features and bug fixes should leave existing tests alone; only a changed requirement edits an expectation. So the change must say which requirement moved. The alternative, editing tests until they pass, is how a suite stops defending anything.
+- **Deleting is maintenance; pruning on coverage is not.** Studies of real projects find that suites evolve mostly through additions, deletions and refactorings, and that tests are deleted because they are obsolete. Removing tests because coverage looks equal is different: coverage-based redundancy detection has many false positives, and coverage-based minimization has lost real fault detection in several studies.
 - **Guards cost twice.** Every guard adds a branch, and every branch asks for a test. Validating input once, at the boundary, keeps both the code and the tests small.
 - **Coverage percentages reward extra tests.** The stopping check asks that every path be accounted for, not that a number goes up.
 
@@ -119,6 +140,7 @@ The skill is a companion to [Concord](https://github.com/bqp007/concord-agent-ha
 
 - Completeness holds only relative to the behaviors you listed and the paths you examined. Whether the behaviors match the real requirement is for the spec and its owner to settle.
 - Coverage shows that a branch ran, not that a test checked its result. Mutation testing on the diff shows that, at a much higher cost.
+- Redundancy across a whole suite cannot be settled by reading the tests or by comparing coverage. It takes a record of which test catches which fault, and whether to pay for that is the project's decision.
 
 ## Sources
 
@@ -129,6 +151,11 @@ The skill is a companion to [Concord](https://github.com/bqp007/concord-agent-ha
 - Matthias Grochtmann and Klaus Grimm, "Classification Trees for Partition Testing," *Software Testing, Verification and Reliability*, 1993.
 - RTCA DO-178C and Hayhurst, Veerhusen, Chilenski and Rierson, *A Practical Tutorial on Modified Condition/Decision Coverage*, NASA/TM-2001-210876 (2001): the formal version of "every condition can change the result", for projects that require it.
 - Mary Jean Harrold, Rajiv Gupta and Mary Lou Soffa, "A Methodology for Controlling the Size of a Test Suite," *ACM TOSEM*, 1993.
+- Leandro Sales Pinto, Saurabh Sinha and Alessandro Orso, "Understanding Myths and Realities of Test-Suite Evolution," FSE 2012.
+- Gregg Rothermel, Mary Jean Harrold, Jeffery Ostrin and Christie Hong, "An Empirical Study of the Effects of Minimization on the Fault Detection Capabilities of Test Suites," ICSM 1998.
+- Shin Yoo and Mark Harman, "Regression Testing Minimization, Selection and Prioritization: A Survey," *Software Testing, Verification and Reliability*, 2012.
+- Negar Koochakzadeh and Vahid Garousi, "A Tester-Assisted Methodology for Test Redundancy Detection," *Advances in Software Engineering*, 2010.
+- Titus Winters, Tom Manshreck and Hyrum Wright, *Software Engineering at Google* (O'Reilly, 2020), chapter 12: tests that do not change when behavior does not.
 - Bertrand Meyer, *Object-Oriented Software Construction*, 2nd ed. (1997): Design by Contract and the non-redundancy principle.
 - Alexis King, "Parse, Don't Validate" (2019).
 
