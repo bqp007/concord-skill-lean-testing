@@ -9,7 +9,7 @@
 
 AI coding agents write tests faster than anyone can read them, and they write too many. They pin config values, mirror the implementation they just wrote, reach into private helpers, and add a guard (and a test for it) for every state they can imagine. Each test passes on the day it is written. Then every retune, refactor or rename turns some of them red, and the fix is always to edit the test. The suite has stopped defending the code and started freezing it.
 
-This skill gives an agent one rule for what a test may assert, a seven-step procedure for planning and writing tests, and a check that tells it when the test set is complete and minimal, so that it knows when to stop.
+This skill gives an agent a small set of principles for what a test may assert, and a description of a finished test set, complete and minimal, so that it knows when to stop. It prescribes no technique and no test count; how to get there is left to the agent's judgment.
 
 ## What changes
 
@@ -25,12 +25,12 @@ This test catches nothing, because whoever retunes the threshold also edits the 
 After: the test checks the rule, with a threshold that the test chooses.
 
 ```python
-@pytest.mark.parametrize("score, flagged", [(0.70, True), (0.69, False)])
+@pytest.mark.parametrize("score, flagged", [(0.69, False), (0.70, True), (0.71, True)])
 def test_flags_scores_at_or_above_the_threshold(score, flagged):
     assert classify(score, threshold=0.70) is flagged
 ```
 
-This test survives any retune, and it still fails if someone writes `>` where the rule says `>=`.
+This test survives any retune. The first two cases fail if someone writes `>` where the rule says `>=`, and the third fails for `==`. Two inputs with the same expected result both earn their place, because they catch different failures.
 
 The same rule removes snapshot tests that nobody reviewed, tests of private helpers, mocks of the project's own modules, guards for states that cannot occur, and the reflex of adding a new regression test for every bug when an existing test should have caught it.
 
@@ -38,18 +38,21 @@ The same rule removes snapshot tests that nobody reviewed, tests of private help
 
 ```mermaid
 flowchart TD
-    A[1. Classify what the change touches] --> B[2. List the behavior classes]
-    B --> C[3. Reuse existing tests before adding]
-    C --> D[4. Write each test from the spec]
-    D --> E[5. Implement, with guards only at trust boundaries]
-    E --> F{6. Complete and minimal?}
-    F -- a class or a branch is unaccounted for --> B
-    F -- yes --> G[7. Consolidate and stop]
+    R[Requirement] --> B[Behaviors the change must have]
+    D[Diff] --> BR[Branches added or altered]
+    B --> C{Complete?}
+    BR --> C
+    C -- a behavior or a branch is unaccounted for --> T[Add or correct a case]
+    T --> C
+    C -- yes --> M{Minimal?}
+    M -- a case catches nothing new --> X[Merge or remove it]
+    X --> M
+    M -- yes --> S[Stop]
 ```
 
 ### The core rule
 
-A failing test tells you something only when its expected value comes from a source with more authority than the code under test. Then the failure means the code is wrong.
+A failing test signals a mismatch between the code and an expectation. The failure helps only when a source independent of the code can settle which side is wrong.
 
 | Outranks the code: a test may assert it | Same authority as the code: a test learns nothing from it |
 |---|---|
@@ -59,23 +62,21 @@ A failing test tells you something only when its expected value comes from a sou
 | a mathematical law: round trip, ordering, idempotence | the algorithm re-implemented inside the test |
 | a golden file that the spec owner approved | |
 
-When a same-authority test fails, nobody can tell which side is wrong, so the only fix is to make the two agree again.
+When a same-authority test fails, nobody can tell which side is wrong, so the only fix is to make the two agree again. An unreviewed snapshot is a change detector, not a test. A reviewed golden file can also go stale, so a failure sends you back to the source to decide whether the code or the test changes.
 
-### The procedure
+### The principles
 
-1. **Classify** each touched part. Logic gets unit tests. A contract gets one contract test per boundary, which checks values, not only shape. Config gets no tests on its values; unit tests inject their own, and one release check runs the loader on the shipped files. Quality on real data gets an evaluation with an owner-set metric. Glue gets one integration path. Trivial code gets nothing.
-2. **List the behavior classes** for each spec clause, with their boundaries. Each class gets one test. The number of classes sets the test budget; the number of changed lines does not.
-3. **Reuse** before you add: keep, extend, replace, merge or delete existing tests. Add a test only for a class that no test covers.
-4. **Write** each test before the code, from the spec, through the public interface, with the config built inside the test.
-5. **Guard** only where input enters the system, and where shared state changes: there, enforce the invariant in one atomic step. A guard for a state that cannot occur adds a branch, and that branch then asks for a test.
-6. **Check** completeness and minimality. When the check holds, stop writing tests.
-7. **Consolidate** the tests that the task touched.
+1. **The expected value must outrank the code.** See the table above.
+2. **The test set is a filter on changes.** It rejects every change that breaks a promise and accepts every change the spec allows.
+3. **Config is not behavior.** No test asserts a tuned value; unit tests inject their own. The production loader validates the shipped files, profile selection and override precedence are tested through the normal entry point, and quality on real data is an evaluation with an owner-set metric.
+4. **Test through contracts.** Use the interface real callers use, at the lowest level that a refactor leaves alone. No private symbols, no mocks of your own modules.
+5. **Guards belong at trust boundaries.** Validate where input enters the system, and enforce invariants on shared state in one atomic step where that state changes. A guard for a state that cannot occur adds a branch, and that branch then asks for a test.
 
-### The stopping check
+### What a finished test set shows
 
-The test set is **complete** when every behavior class has a test, and every branch that the change adds is either reached by a test or has a stated reason: glue, third-party code, logging only, or guaranteed by the type system.
+The test set is **complete** when every distinct behavior the change must have is covered by at least one assertion that fails when the behavior breaks, and every branch that the change adds or alters is exercised or accounted for: where it runs, which invariant prevents it, or what prevents verification.
 
-The test set is **minimal** when every test maps to exactly one behavior class, no unit test reads production config, and no test asserts a tuned config value or reaches a private symbol.
+The test set is **minimal** when every case catches a failure that the rest of the suite would miss, existing tests were reused before new ones were added, and no test asserts a tuned config value or reaches a private symbol.
 
 A changed branch that no requirement asks for is an undecided behavior. The owner decides it, or the code goes. A test would only make it permanent.
 
@@ -109,13 +110,14 @@ The skill is a companion to [Concord](https://github.com/bqp007/concord-agent-ha
 
 - **A test suite is a filter on changes.** It should reject every change that breaks a promise and accept every change the spec allows: refactors, retunes, performance work, new features, renames and log text. Most over-testing is a filter that rejects allowed changes.
 - **Information needs authority.** A test checked against config or against the code's own output can only report that something changed. It cannot report that something is wrong.
-- **Completeness and minimality come from two lists.** One list holds the behavior classes that the spec decides. The other holds the branches that the changed code takes. Each class gets one test, and each branch is reached or explained. Anything left over on either side is a finding, not a reason to add a test.
+- **Completeness and minimality come from two lists.** One list holds the behaviors that the requirement decides. The other holds the branches that the changed code takes. Each behavior is covered, each branch is exercised or explained, and each case catches a failure the others miss. The size of the suite follows from the behaviors, not from a count fixed in advance.
+- **Principles, not procedure.** A capable model does not need a recipe, and a recipe constrains it. The skill says what a good test set is and leaves the method open.
 - **Guards cost twice.** Every guard adds a branch, and every branch asks for a test. Validating input once, at the boundary, keeps both the code and the tests small.
 - **Coverage percentages reward extra tests.** The stopping check asks that every branch be accounted for, not that a number goes up.
 
 ## Limits
 
-- Completeness holds only relative to the behavior classes you listed and the branches you measured. Whether the classes match the real requirement is for the spec and its owner to settle.
+- Completeness holds only relative to the behaviors you listed and the branches you measured. Whether the behaviors match the real requirement is for the spec and its owner to settle.
 - Coverage shows that a branch ran, not that a test checked its result. Mutation testing on the diff shows that, at a much higher cost.
 
 ## Sources
@@ -125,7 +127,7 @@ The skill is a companion to [Concord](https://github.com/bqp007/concord-agent-ha
 - Google Testing Blog, "Change-Detector Tests Considered Harmful" (2015).
 - Thomas Ostrand and Marc Balcer, "The Category-Partition Method for Specifying and Generating Functional Tests," *Communications of the ACM*, 1988.
 - Matthias Grochtmann and Klaus Grimm, "Classification Trees for Partition Testing," *Software Testing, Verification and Reliability*, 1993.
-- RTCA DO-178C: modified condition/decision coverage (MC/DC); Hayhurst, Veerhusen, Chilenski and Rierson, *A Practical Tutorial on Modified Condition/Decision Coverage*, NASA/TM-2001-210876 (2001), for masking MC/DC and coupled conditions.
+- RTCA DO-178C and Hayhurst, Veerhusen, Chilenski and Rierson, *A Practical Tutorial on Modified Condition/Decision Coverage*, NASA/TM-2001-210876 (2001): the formal version of "every condition can change the result", for projects that require it.
 - Mary Jean Harrold, Rajiv Gupta and Mary Lou Soffa, "A Methodology for Controlling the Size of a Test Suite," *ACM TOSEM*, 1993.
 - Bertrand Meyer, *Object-Oriented Software Construction*, 2nd ed. (1997): Design by Contract and the non-redundancy principle.
 - Alexis King, "Parse, Don't Validate" (2019).
