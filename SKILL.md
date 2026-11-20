@@ -59,20 +59,15 @@ State that something else can change between the check and the use is input too:
 
 ### The suite outlives the task
 
-The tests you write join a suite that other tasks wrote and later tasks will change. Each test is a standing claim: this behavior, this expected result, from this source. A task changes that set of claims, so place each new case against the tests that are already there:
+The tests you write join a suite that other tasks wrote and later tasks will change. Each test is a standing claim: this behavior, this expected result, from this source. A task changes that set of claims, so weigh each new case against the tests that are already there. A new case earns its place only by catching a failure that the existing tests miss. When it catches everything an existing test catches and more, the older test has nothing left to add. Whether the case becomes a new test, a row in an existing one or a replacement is your call.
 
-- It catches a failure that no existing test catches: add it beside the tests of that behavior.
-- An existing test already catches what it catches: do not add it.
-- It catches what an existing test catches, and more: replace the weaker test.
-- It covers a new input class of a behavior that already has a test: extend that test.
+A new expectation that contradicts an existing test is a conflict between requirements, not between tests. An existing test that turns red is evidence first, and the source decides whether the code or the test changes: the requirement may have changed, the old expectation may have been wrong or tied to an incidental detail, or the new code may be wrong. When two sources of equal rank disagree, ask the owner. Do not edit an expectation until it passes without saying what the source supports.
 
-A new expectation that contradicts an existing test is a conflict between requirements, not between tests. An existing test that turns red is evidence first. The source decides among three cases. The requirement changed, so the old expectation is replaced and the change names the requirement. The old test pinned an incidental detail, so the test is corrected or deleted. Or the new code is wrong, so the code changes. When two sources of equal rank disagree, ask the owner. Do not edit an expectation until it passes without saying which case applies.
+An expectation whose behavior the change removed can keep passing, so nothing flags it. Remove it in the same change, and keep the checks in that test for behavior that survives.
 
-A test whose behavior the change removed still passes, so nothing flags it. Delete it in the same change.
+Maintain the tests of the behaviors the task touches and leave the assertions of the others alone; a suite-wide cleanup is a task of its own. Do not remove a test because another test runs the same lines: equal coverage does not mean that the same failures are caught.
 
-Maintain the tests of the behaviors the task touches and leave the rest alone; a suite-wide cleanup is a task of its own. Do not remove a test because another test runs the same lines: equal coverage does not mean that the same failures are caught.
-
-Placement works only when a test says what it guards. Name each test for its behavior, keep it with the other tests of that behavior and not under a ticket or bug number, and make its source findable. A test of unknown origin is a change detector until someone establishes what it should show.
+All of this works only when a test says what it guards. Name each test for its behavior, not for a ticket or a bug number, and make its source findable. A test of unknown origin is a change detector until someone establishes what it should show.
 
 ## What a finished test set shows
 
@@ -91,10 +86,9 @@ Placement works only when a test says what it guards. Name each test for its beh
 
 **Consistent with the suite**
 
-- Every new case was placed against the existing tests of its behavior: added beside them, merged into one of them, or dropped as a duplicate.
-- Every expectation that the change edited or deleted names the requirement that changed, or the incidental detail the old test pinned.
-- No test remains for a behavior the change removed.
-- Tests of behaviors the task did not touch are unchanged.
+- Every expectation whose meaning changed, or that was removed, is explained by its source: the requirement that changed, or why the old expectation was unsupported.
+- No expectation remains for a behavior the change removed, and the checks for behavior that survives are kept.
+- Assertions on behaviors the task did not touch are unchanged. An edit to shared setup that only keeps those tests running does not count as a change to them.
 
 When all three hold, stop writing tests. At the end of a task, go over the tests it touched once more against these points.
 
@@ -111,4 +105,4 @@ Without evidence, the finding is a question, not a defect.
 
 - Completeness holds only relative to the behaviors you listed and the paths you examined. Whether the behaviors match the real requirement is for the spec and its owner to settle.
 - Coverage shows that a branch ran, not that a test checked its result. Mutation testing on the diff shows the second, but it costs much more; weigh that cost against what the project requires.
-- Redundancy across a whole suite cannot be settled by reading the tests or by comparing coverage. It takes a record of which test catches which fault, and whether to pay for that is a decision for the project.
+- Equal coverage alone does not establish that a test is redundant. That takes an argument about the failures each test catches.
