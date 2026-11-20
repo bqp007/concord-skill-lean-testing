@@ -1,9 +1,9 @@
 ---
-name: lean-tests
+name: concord-skill-lean-testing
 description: Plan, write, review and consolidate tests so the test set is complete and minimal — every behavior the change decides has exactly one test, no test pins config values or copies the code, and no defensive guard adds branches that exist only to be tested. Use this skill whenever you write a test plan, add or change tests, add a regression test for a bug fix, consolidate tests after a change, review a test diff, decide whether something needs a test at all, or are about to add a guard, an assert or a validation check — even when the request only says "add tests" or "make it robust".
 ---
 
-# Lean tests
+# Lean testing
 
 A test earns its place when it catches a fault that no other test catches and passes on every change the spec allows. A test set is finished when it is complete (every behavior and every changed branch is accounted for) and minimal (each test guards a distinct behavior and touches only the public interface). Extra tests are not free: each one is code to maintain, and a test that breaks on legitimate changes slows every later change without protecting anything.
 
